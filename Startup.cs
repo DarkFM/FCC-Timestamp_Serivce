@@ -34,6 +34,10 @@ namespace TimestampMicroservice
             {
                 app.UseDeveloperExceptionPage();
             }
+            else
+            {
+                app.UseExceptionHandler("/api/timestamp/baddata");
+            }
 
             // app.UseHttpsRedirection();
 
