@@ -25,6 +25,8 @@ namespace TimestampMicroservice
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddControllers();
+            services.AddCors(options
+                => options.AddDefaultPolicy(policy => policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -43,6 +45,8 @@ namespace TimestampMicroservice
 
             app.UseRouting();
 
+            app.UseCors();
+
             app.UseAuthorization();
 
             app.UseEndpoints(endpoints =>
@@ -60,51 +64,52 @@ namespace TimestampMicroservice
                     await context.Response.BodyWriter.AsStream().WriteAsync(bytes);
                 });
 
+                endpoints.MapGet("/api/timestamp", context =>
+                {
+                    var logger = context.RequestServices.GetRequiredService<ILogger<object>>();
+                    var now = DateTimeOffset.UtcNow;
+                    var responseObj = new
+                    {
+                        Unix = now.ToUnixTimeMilliseconds(),
+                        UTC = now.ToString("r")
+                    };
+                    logger.LogInformation("Received empty date string " + responseObj);
+                    SendResponse(context, responseObj, StatusCodes.Status200OK);
+                    return System.Threading.Tasks.Task.CompletedTask;
+                });
+
                 endpoints.MapGet("/api/timestamp/{*dateString}", context =>
                 {
                     var logger = context.RequestServices.GetRequiredService<ILogger<object>>();
-                    if (!context.Request.RouteValues.TryGetValue("dateString", out object dateString))
+
+                    var date = (string)context.Request.RouteValues["dateString"];
+                    if (DateTimeOffset.TryParse(date, out var parsedDate))
                     {
-                        var now = DateTimeOffset.UtcNow;
+                        parsedDate = new DateTimeOffset(parsedDate.Date, TimeSpan.FromHours(0));
+                        logger.LogInformation("Received date of " + parsedDate);
+                        var epoc = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
                         var responseObj = new
                         {
-                            Unix = now.ToUnixTimeMilliseconds(),
-                            UTC = now.ToString("r")
+                            Unix = parsedDate.ToUnixTimeMilliseconds(),
+                            UTC = parsedDate.ToString("r")
                         };
-                        logger.LogInformation("Received empty date string " + responseObj);
+
+                        SendResponse(context, responseObj, StatusCodes.Status200OK);
+                    }
+                    else if (double.TryParse(date, out var epocMillis))
+                    {
+                        var baseEpocMilliSeconds = DateTime.UnixEpoch.Ticks / TimeSpan.TicksPerMillisecond;
+                        var dateTime = new DateTime(TimeSpan.FromMilliseconds(baseEpocMilliSeconds + epocMillis).Ticks, DateTimeKind.Utc);
+                        var responseObj = new
+                        {
+                            Unix = epocMillis,
+                            UTC = dateTime.ToString("r")
+                        };
                         SendResponse(context, responseObj, StatusCodes.Status200OK);
                     }
                     else
                     {
-                        var date = (string)dateString;
-                        if (DateTimeOffset.TryParse(date, out var parsedDate))
-                        {
-                            parsedDate = new DateTimeOffset(parsedDate.Date, TimeSpan.FromHours(0));
-                            logger.LogInformation("Received date of " + parsedDate);
-                            var epoc = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-                            var responseObj = new
-                            {
-                                Unix = parsedDate.ToUnixTimeMilliseconds(),
-                                UTC = parsedDate.ToString("r")
-                            };
-
-                            SendResponse(context, responseObj, StatusCodes.Status200OK);
-                        }
-                        else if (double.TryParse(date, out var epocMillis))
-                        {
-                            var baseEpocMilliSeconds = DateTime.UnixEpoch.Ticks / TimeSpan.TicksPerMillisecond;
-                            var dateTime = new DateTime(TimeSpan.FromMilliseconds(baseEpocMilliSeconds + epocMillis).Ticks, DateTimeKind.Utc);
-                            var responseObj = new
-                            {
-                                Unix = epocMillis,
-                                UTC = dateTime.ToString("r")
-                            };
-                            SendResponse(context, responseObj, StatusCodes.Status200OK);
-                        }
-                        else
-                        {
-                            SendResponse(context, new { Error = "Invalid Date" }, StatusCodes.Status400BadRequest);
-                        }
+                        SendResponse(context, new { Error = "Invalid Date" }, StatusCodes.Status200OK);
                     }
 
                     return System.Threading.Tasks.Task.CompletedTask;
