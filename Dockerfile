@@ -5,6 +5,7 @@ WORKDIR /source
 EXPOSE 80
 # EXPOSE 443
 
+# ENV ASPNETCORE_URLS="http://+" ASPNETCORE_ENVIRONMENT="Production"
 ENV ASPNETCORE_URLS="http://+" ASPNETCORE_ENVIRONMENT="Production"
 
 # copy csproj and restore as distinct layers
@@ -20,4 +21,5 @@ FROM mcr.microsoft.com/dotnet/core/aspnet:3.1
 WORKDIR /app
 COPY --from=build /app ./
 COPY --from=build /source/*.html ./
-ENTRYPOINT ["dotnet", "TimestampMicroservice.dll"]
+# ENTRYPOINT ["dotnet", "TimestampMicroservice.dll"]
+CMD ASPNETCORE_URLS=http://*:$PORT dotnet TimestampMicroservice.dll
