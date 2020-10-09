@@ -84,7 +84,6 @@ namespace TimestampMicroservice
                             var epoc = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
                             var responseObj = new
                             {
-                                // Unix = (parsedDate - epoc).TotalMilliseconds,
                                 Unix = parsedDate.ToUnixTimeMilliseconds(),
                                 UTC = parsedDate.ToString("r")
                             };
